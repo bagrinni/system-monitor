@@ -9,7 +9,6 @@ Base = declarative_base()
 
 class MonitoringData(Base):
     __tablename__ = "monitoring_data"
-
     id = Column(Integer, primary_key=True)
     cpu = Column(Float)
     ram = Column(Float)
@@ -23,7 +22,11 @@ class Database:
 
     def insert_data(self, data):
         session = self.Session()
-        new_entry = MonitoringData(cpu=data["cpu"], ram=data["ram"], disk=data["disk"])
+        new_entry = MonitoringData(
+            cpu=round(data["cpu"], 2),
+            ram=round(data["ram"], 2),
+            disk=round(data["disk"], 2)
+        )
         session.add(new_entry)
         session.commit()
         session.close()
@@ -32,7 +35,7 @@ class SystemMonitor(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("System Monitor")
-        self.setGeometry(100, 100, 300, 300)
+        self.setGeometry(100, 100, 300, 350)
 
         self.database = Database("monitoring.db")
         self.main_widget = QWidget()
@@ -73,17 +76,23 @@ class SystemMonitor(QMainWindow):
 
     def update_stats(self):
         cpu_usage = psutil.cpu_percent()
-        ram_usage = psutil.virtual_memory().percent
-        disk_usage = psutil.disk_usage("/").percent
+        ram = psutil.virtual_memory()
+        ram_usage = ram.used / (1024 ** 3)
+        total_ram = ram.total / (1024 ** 3)
+        disk = psutil.disk_usage("/")
+        disk_usage = disk.used / (1024 ** 3)
+        total_disk = disk.total / (1024 ** 3)
 
         self.cpu_bar.setValue(int(cpu_usage))
         self.cpu_label.setText(f"CPU Usage: {cpu_usage}%")
 
+        self.ram_bar.setMaximum(int(total_ram))
         self.ram_bar.setValue(int(ram_usage))
-        self.ram_label.setText(f"RAM Usage: {ram_usage}%")
+        self.ram_label.setText(f"RAM Usage: {ram_usage:.2f} GB (Total: {total_ram:.2f} GB)")
 
+        self.disk_bar.setMaximum(int(total_disk))
         self.disk_bar.setValue(int(disk_usage))
-        self.disk_label.setText(f"Disk Usage: {disk_usage}%")
+        self.disk_label.setText(f"Disk Usage: {disk_usage:.2f} GB (Total: {total_disk:.2f} GB)")
 
         if self.recording:
             self.database.insert_data({
